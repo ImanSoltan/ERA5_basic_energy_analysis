@@ -3,25 +3,30 @@ import os
 import calendar
 
 # Default parameters (can be customized by the user)
-DEFAULT_YEARS = [2024]
+DEFAULT_YEARS = [2024] # Consider updating to 2025 or a relevant recent year for actual runs if needed
 DEFAULT_MONTHS = list(range(1, 13))  # January to December
 DEFAULT_AREA = [50.75, 7.0, 50.70, 7.15]  # North, West, South, East for Bonn, Germany
+
+# Updated DEFAULT_VARIABLES with common short names for ERA5 Single Levels
+# Refer to the CDS documentation for the definitive list and potential alternatives:
+# https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=form
+# Click on "Variables" and then "Show MARS parameters" for short names
 DEFAULT_VARIABLES = [
     "10m_u_component_of_wind",
     "10m_v_component_of_wind",
     "2m_temperature",
-    "surface_pressure",
     "total_precipitation",
-    "surface_latent_heat_flux",
     "surface_net_solar_radiation",
-    "surface_net_thermal_radiation",
-    "surface_sensible_heat_flux",
     "surface_solar_radiation_downwards",
-    "surface_thermal_radiation_downwards",
     "total_sky_direct_solar_radiation_at_surface",
     "cloud_base_height",
     "total_cloud_cover"
 ]
+# Note on Fluxes and Radiation:
+# - Many flux/radiation parameters are 'mean rates' (ending in 'f') and are accumulated.
+# - 'Instantaneous' versions might have different short names if available.
+# - Always verify if you need 'mean rate', 'accumulated total', or 'instantaneous' from the CDS variable description.
+
 DEFAULT_BASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw"))
 
 def download_era5_data(
@@ -46,7 +51,7 @@ def download_era5_data(
     if base_path is None:
         base_path = DEFAULT_BASE_PATH
 
-    hourly_times = [f"{h:02d}:00" for h in range(24)]
+    hourly_times = ["00:00", "06:00", "12:00", "18:00"]
 
     c = cdsapi.Client() # Assumes .cdsapirc file is configured
 
@@ -68,7 +73,7 @@ def download_era5_data(
                 continue
 
             print(f"Requesting data for {year}-{month:02d}...")
-            print(f"Variables: {variables}")
+            print(f"Variables (short names): {variables}")
             print(f"Area: {area}")
 
             request = {
@@ -95,6 +100,13 @@ def download_era5_data(
                     os.remove(target_file)
 
 if __name__ == "__main__":
+    # Create a dummy __file__ for testing if not present
+    if '__file__' not in globals():
+        __file__ = 'dummy_downloader_script.py'
+        # Create dummy directory structure for DEFAULT_BASE_PATH to resolve
+        os.makedirs(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw")), exist_ok=True)
+
+
     print("Starting ERA5 data download process...")
     download_era5_data()
-    print("ERA5 data download process finished.") 
+    print("ERA5 data download process finished.")

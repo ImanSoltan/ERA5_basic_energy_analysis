@@ -3,6 +3,7 @@ import glob
 import xarray as xr
 import numpy as np
 import zipfile
+import tempfile
 
 def kelvin_to_celsius(temp_k):
     return temp_k - 273.15
@@ -40,6 +41,26 @@ def extract_grib_from_zip(file_path):
             return extract_path
     return file_path
 
+def try_open_dataset(file_path):
+    """
+    Try to open the file as NetCDF (with all supported engines) or as GRIB (with cfgrib).
+    Returns the engine used if successful, else None.
+    """
+    # Try NetCDF engines
+    for engine in ['netcdf4', 'h5netcdf', 'scipy']:
+        try:
+            xr.open_dataset(file_path, engine=engine).close()
+            return engine
+        except Exception:
+            continue
+    # Try GRIB engine
+    try:
+        xr.open_dataset(file_path, engine='cfgrib').close()
+        return 'cfgrib'
+    except Exception:
+        pass
+    return None
+
 def preprocess_era5_data(input_dir='data/raw', output_dir='data/processed', year=2024, months=None, area_name='Bonn'):
     """
     Preprocess ERA5 NetCDF files: merge, convert units, calculate derived variables, and save processed data.
@@ -49,54 +70,58 @@ def preprocess_era5_data(input_dir='data/raw', output_dir='data/processed', year
         months = list(range(1, 13))  # Default: Jan-Dec
     os.makedirs(output_dir, exist_ok=True)
     
-    # Collect all NetCDF or GRIB files for the specified year and months
+    # Collect all files for the specified year and months
     data_files = []
-    for month in months:
-        nc_pattern = os.path.join(input_dir, str(year), f"{month:02d}", f"era5_{year}_{month:02d}.nc")
-        grib_pattern = os.path.join(input_dir, str(year), f"{month:02d}", f"era5_{year}_{month:02d}.grib")
-        found_nc = glob.glob(nc_pattern)
-        found_grib = glob.glob(grib_pattern)
-        for f in found_nc:
-            try:
-                data_files.append(extract_nc_from_zip(f))
-            except Exception as e:
-                print(f"Skipping {f}: {e}")
-        for f in found_grib:
-            try:
-                data_files.append(extract_grib_from_zip(f))
-            except Exception as e:
-                print(f"Skipping {f}: {e}")
+    years = year if isinstance(year, (list, tuple)) else [year]
+    for y in years:
+        for month in months:
+            month_dir = os.path.join(input_dir, str(y), f"{month:02d}")
+            grib_pattern = os.path.join(month_dir, "*.grib")
+            nc_pattern = os.path.join(month_dir, "*.nc")
+            print(f"Looking for files with pattern: {grib_pattern}")
+            found_grib = glob.glob(grib_pattern)
+            print(f"Found {len(found_grib)} GRIB files.")
+            print(f"Looking for files with pattern: {nc_pattern}")
+            found_nc = glob.glob(nc_pattern)
+            print(f"Found {len(found_nc)} NetCDF files.")
+            data_files.extend(found_grib)
+            data_files.extend(found_nc)
     if not data_files:
-        print(f"No NetCDF or GRIB files found for {year} months {months} in {input_dir}")
+        print(f"No files found for {year} months {months} in {input_dir}")
         return
     print(f"Found {len(data_files)} files. Loading and merging...")
-    
-    # Validate all files are NetCDF or GRIB before merging
+
+    # Prepare a list to hold valid files
     valid_files = []
+    temp_dirs = []
     for f in data_files:
-        try:
-            if f.endswith('.nc'):
-                xr.open_dataset(f).close()
-            elif f.endswith('.grib'):
-                xr.open_dataset(f, engine='cfgrib').close()
+        # If it's a zip, extract all contents to a temp dir
+        if zipfile.is_zipfile(f):
+            temp_dir = tempfile.mkdtemp()
+            temp_dirs.append(temp_dir)
+            with zipfile.ZipFile(f, 'r') as z:
+                z.extractall(temp_dir)
+            extracted_files = [os.path.join(temp_dir, name) for name in z.namelist()]
+            for ef in extracted_files:
+                engine = try_open_dataset(ef)
+                if engine:
+                    valid_files.append((ef, engine))
+                else:
+                    print(f"Skipping extracted {ef}: not a valid NetCDF or GRIB file.")
+        else:
+            engine = try_open_dataset(f)
+            if engine:
+                valid_files.append((f, engine))
             else:
-                raise ValueError("Unknown file type")
-            valid_files.append(f)
-        except Exception as e:
-            print(f"Skipping {f}: not a valid NetCDF or GRIB file. {e}")
+                print(f"Skipping {f}: not a valid NetCDF or GRIB file.")
     if not valid_files:
         print("No valid NetCDF or GRIB files to process after extraction/validation.")
         return
-    
+
     # Open and merge all files along the time dimension
     datasets = []
-    for f in valid_files:
-        if f.endswith('.nc'):
-            ds = xr.open_dataset(f)
-        elif f.endswith('.grib'):
-            ds = xr.open_dataset(f, engine='cfgrib')
-        else:
-            continue
+    for f, engine in valid_files:
+        ds = xr.open_dataset(f, engine=engine)
         datasets.append(ds)
     ds = xr.merge(datasets)
     
