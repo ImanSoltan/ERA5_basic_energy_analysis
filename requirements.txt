@@ -1,0 +1,10 @@
+cdsapi
+xarray
+pandas
+numpy
+scipy
+scikit-learn
+matplotlib
+seaborn
+cartopy
+cfgrib  # For GRIB file support with xarray 
