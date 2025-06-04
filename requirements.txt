@@ -8,3 +8,4 @@ matplotlib
 seaborn
 cartopy
 cfgrib  # For GRIB file support with xarray 
+pygrib 

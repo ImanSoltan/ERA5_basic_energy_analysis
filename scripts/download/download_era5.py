@@ -12,20 +12,33 @@ DEFAULT_AREA = [50.75, 7.0, 50.70, 7.15]  # North, West, South, East for Bonn, G
 # https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=form
 # Click on "Variables" and then "Show MARS parameters" for short names
 DEFAULT_VARIABLES = [
-    "10m_u_component_of_wind",
-    "10m_v_component_of_wind",
-    "2m_temperature",
-    "total_precipitation",
-    "surface_net_solar_radiation",
-    "surface_solar_radiation_downwards",
-    "total_sky_direct_solar_radiation_at_surface",
-    "cloud_base_height",
-    "total_cloud_cover"
+    # Radiation components
+    "surface_solar_radiation_downwards",                  # ssrd
+    "surface_net_solar_radiation",                       # ssr
+    "surface_thermal_radiation_downwards",               # strd
+    "surface_net_thermal_radiation",                     # str
+    "total_sky_direct_solar_radiation_at_surface",       # fdir
+    "top_net_solar_radiation",                          # tisr
+    "surface_solar_radiation_downwards_clear_sky",       # ssrc
+    
+    # Wind components
+    "10m_u_component_of_wind",                          # u10
+    "10m_v_component_of_wind",                          # v10
+    
+    # Temperature
+    "2m_temperature",                                   # t2m
+    
+    # Other meteorological variables
+    "total_precipitation",                              # tp
+    "surface_pressure",                                 # sp
+    "total_cloud_cover",                               # tcc
+    "cloud_base_height",                               # cbh
 ]
 # Note on Fluxes and Radiation:
-# - Many flux/radiation parameters are 'mean rates' (ending in 'f') and are accumulated.
-# - 'Instantaneous' versions might have different short names if available.
-# - Always verify if you need 'mean rate', 'accumulated total', or 'instantaneous' from the CDS variable description.
+# - Many flux/radiation parameters are accumulated over the time step
+# - Values represent the average rate over the time step
+# - Units are typically in W/m² for radiation
+# - Some variables have both instantaneous and accumulated versions
 
 DEFAULT_BASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "raw"))
 
