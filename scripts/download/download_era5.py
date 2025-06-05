@@ -5,7 +5,7 @@ import calendar
 # Default parameters (can be customized by the user)
 DEFAULT_YEARS = [2024] # Consider updating to 2025 or a relevant recent year for actual runs if needed
 DEFAULT_MONTHS = list(range(1, 13))  # January to December
-DEFAULT_AREA = [50.75, 7.0, 50.70, 7.15]  # North, West, South, East for Bonn, Germany
+DEFAULT_AREA = [50.7, 7.1, 50.7, 7.1]  # Specific point for Bonn, Germany (North, West, South, East)
 
 # Updated DEFAULT_VARIABLES with common short names for ERA5 Single Levels
 # Refer to the CDS documentation for the definitive list and potential alternatives:
@@ -13,26 +13,19 @@ DEFAULT_AREA = [50.75, 7.0, 50.70, 7.15]  # North, West, South, East for Bonn, G
 # Click on "Variables" and then "Show MARS parameters" for short names
 DEFAULT_VARIABLES = [
     # Radiation components
-    "surface_solar_radiation_downwards",                  # ssrd
-    "surface_net_solar_radiation",                       # ssr
-    "surface_thermal_radiation_downwards",               # strd
-    "surface_net_thermal_radiation",                     # str
-    "total_sky_direct_solar_radiation_at_surface",       # fdir
-    "top_net_solar_radiation",                          # tisr
-    "surface_solar_radiation_downwards_clear_sky",       # ssrc
+    "surface_solar_radiation_downwards",                  # ssrd (GHI) - ESSENTIAL
+    "total_sky_direct_solar_radiation_at_surface",       # fdir (DNI) - RECOMMENDED for better POA
+    "surface_solar_radiation_downwards_clear_sky",       # ssrc - OPTIONAL for clear-sky index
     
-    # Wind components
+    # Temperature
+    "2m_temperature",                                   # t2m - ESSENTIAL for temp correction
+    
+    # Wind components (Optional, for more detailed temp/efficiency modeling)
     "10m_u_component_of_wind",                          # u10
     "10m_v_component_of_wind",                          # v10
     
-    # Temperature
-    "2m_temperature",                                   # t2m
-    
-    # Other meteorological variables
-    "total_precipitation",                              # tp
-    "surface_pressure",                                 # sp
-    "total_cloud_cover",                               # tcc
-    "cloud_base_height",                               # cbh
+    # Cloud cover (Optional, for analysis or simpler models)
+    "total_cloud_cover",                               # tcc 
 ]
 # Note on Fluxes and Radiation:
 # - Many flux/radiation parameters are accumulated over the time step
@@ -64,7 +57,7 @@ def download_era5_data(
     if base_path is None:
         base_path = DEFAULT_BASE_PATH
 
-    hourly_times = ["00:00", "06:00", "12:00", "18:00"]
+    hourly_times = [f"{h:02d}:00" for h in range(24)]  # Download all 24 hours
 
     c = cdsapi.Client() # Assumes .cdsapirc file is configured
 

@@ -138,7 +138,7 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
     """
     Merge individual variable NetCDF files into a single dataset.
     Handles different time dimensions and step coordinates.
-    Only keeps data at 00:00, 06:00, 12:00, and 18:00 UTC.
+    Processes all available time steps from the input files.
     
     Parameters:
     -----------
@@ -152,7 +152,7 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
     Returns:
     --------
     xarray.Dataset
-        Merged dataset containing all variables at 00, 06, 12, 18 UTC
+        Merged dataset containing all variables with all available time steps.
     """
     if output_file is None:
         output_file = os.path.join(processed_dir, f'era5_merged_{area_name}.nc')
@@ -216,34 +216,24 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
         all_times = pd.DatetimeIndex(sorted(set(all_times)))
         print(f"Total unique timestamps before filtering: {len(all_times)}")
         
-        # Filter to only keep 00:00, 06:00, 12:00, 18:00
-        filtered_times = all_times[all_times.hour.isin([0, 6, 12, 18])]
-        print(f"After filtering to 00, 06, 12, 18 UTC: {len(filtered_times)} timestamps")
+        # Keep all unique timestamps from the input files
+        filtered_times = all_times  # Keep all hours
+        print(f"Total unique timestamps after processing: {len(filtered_times)} timestamps")
         
         if len(filtered_times) == 0:
-            raise ValueError("No timestamps remaining after filtering for 00, 06, 12, 18 UTC")
+            raise ValueError("No timestamps remaining after filtering")
             
         # Ensure all datasets cover the same time period
         aligned_datasets = []
         for var_name, ds in standardized_datasets.items():
             print(f"Aligning {var_name}...")
             try:
-                # Convert times to datetime64[ns] for consistent comparison
-                if 'time' not in ds.coords:
-                    print(f"Warning: No time coordinate found in {var_name}, skipping")
-                    continue
-                    
                 # Convert time to pandas DatetimeIndex for consistent handling
                 ds_time = pd.DatetimeIndex(ds.time.values)
                 
-                # Filter to only keep the desired hours
-                mask = ds_time.hour.isin([0, 6, 12, 18])
-                if not mask.any():
-                    print(f"Warning: No data at 00, 06, 12, 18 UTC for {var_name}")
-                    continue
-                    
-                # Select only the filtered times
-                ds_filtered = ds.sel(time=mask)
+                # No filtering by hour needed here, keep all times from the dataset
+                # Use the dataset as is (all times)
+                ds_filtered = ds # Keep all hours from the individual dataset
                 
                 # Check for missing times
                 ds_times = pd.DatetimeIndex(ds_filtered.time.values)
@@ -281,7 +271,7 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
         merged_ds.attrs['creation_date'] = str(pd.Timestamp.now())
         merged_ds.attrs['description'] = f'Merged ERA5 variables for {area_name}'
         merged_ds.attrs['source_files'] = ', '.join([os.path.basename(f) for f in nc_files])
-        merged_ds.attrs['time_standardization'] = 'All variables aligned to common timesteps 00, 06, 12, 18 UTC'
+        merged_ds.attrs['time_standardization'] = 'All variables aligned to common timesteps, preserving all available hours.'
         
         # Save the merged dataset
         merged_ds.to_netcdf(output_file)
