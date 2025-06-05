@@ -229,6 +229,9 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
             print(f"Aligning {var_name}...")
             try:
                 # Convert time to pandas DatetimeIndex for consistent handling
+                if 'time' not in ds.coords:
+                    print(f"Warning: No time coordinate found in {var_name}, skipping")
+                    continue
                 ds_time = pd.DatetimeIndex(ds.time.values)
                 
                 # No filtering by hour needed here, keep all times from the dataset
@@ -272,7 +275,57 @@ def merge_variable_files(processed_dir, output_file=None, area_name='Bonn'):
         merged_ds.attrs['description'] = f'Merged ERA5 variables for {area_name}'
         merged_ds.attrs['source_files'] = ', '.join([os.path.basename(f) for f in nc_files])
         merged_ds.attrs['time_standardization'] = 'All variables aligned to common timesteps, preserving all available hours.'
-        
+
+        # Add extended time metadata
+        if 'time' in merged_ds.coords:
+            times_pd = pd.to_datetime(merged_ds.time.values)
+            if not times_pd.empty:
+                unique_years = sorted(list(set(times_pd.year)))
+                if len(unique_years) == 1:
+                    merged_ds.attrs['data_years'] = str(unique_years[0])
+                elif len(unique_years) > 1:
+                    merged_ds.attrs['data_years'] = f"{min(unique_years)}-{max(unique_years)}"
+                else:
+                    merged_ds.attrs['data_years'] = "N/A"
+
+                merged_ds.attrs['time_coverage_start'] = str(times_pd.min())
+                merged_ds.attrs['time_coverage_end'] = str(times_pd.max())
+                merged_ds.attrs['number_of_timesteps'] = len(times_pd)
+
+                if len(times_pd) > 1:
+                    time_diffs = times_pd.to_series().diff().dropna()
+                    if not time_diffs.empty:
+                        # Get the mode of time differences in seconds
+                        common_diff_seconds = time_diffs.dt.total_seconds().mode()
+                        if not common_diff_seconds.empty:
+                            val_common_diff_seconds = common_diff_seconds[0]
+                            if val_common_diff_seconds == 3600:
+                                merged_ds.attrs['time_step_frequency'] = "hourly"
+                            elif val_common_diff_seconds == 10800: # 3 * 3600
+                                merged_ds.attrs['time_step_frequency'] = "3-hourly"
+                            elif val_common_diff_seconds == 21600: # 6 * 3600
+                                merged_ds.attrs['time_step_frequency'] = "6-hourly"
+                            elif val_common_diff_seconds == 86400: # 24 * 3600
+                                merged_ds.attrs['time_step_frequency'] = "daily"
+                            else:
+                                merged_ds.attrs['time_step_frequency'] = f"{int(val_common_diff_seconds)} seconds"
+                        else:
+                            merged_ds.attrs['time_step_frequency'] = "irregular"
+                    else: # Only one data point after diff, or all diffs are NaT
+                        merged_ds.attrs['time_step_frequency'] = "single data point or insufficient data for frequency"
+                elif len(times_pd) == 1:
+                    merged_ds.attrs['time_step_frequency'] = "single time point"
+                else:
+                    merged_ds.attrs['time_step_frequency'] = "no time data"
+            else:
+                merged_ds.attrs['data_years'] = "N/A"
+                merged_ds.attrs['time_coverage_start'] = "N/A"
+                merged_ds.attrs['time_coverage_end'] = "N/A"
+                merged_ds.attrs['number_of_timesteps'] = 0
+                merged_ds.attrs['time_step_frequency'] = "no time data"
+        else:
+            print("Warning: 'time' coordinate not found in merged dataset. Cannot add detailed time metadata.")
+
         # Save the merged dataset
         merged_ds.to_netcdf(output_file)
         print(f"\nSuccessfully merged {len(standardized_datasets)} variables into {output_file}")

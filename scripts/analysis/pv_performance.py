@@ -215,8 +215,8 @@ class ERA5Processor:
         if ssrd_var not in df.columns:
             raise ValueError(f"Column {ssrd_var} not found in ERA5 data")
         
-        # Convert J/m² to W/m² (6-hourly data)
-        df['ssrd_wm2'] = df[ssrd_var] / (6 * 3600)  # 6 hours in seconds
+        # Convert J/m² to W/m² (hourly data)
+        df['ssrd_wm2'] = df[ssrd_var] / 3600       # 1 hour in seconds
         
         # Calculate solar geometry
         df['doy'] = df['time'].dt.dayofyear

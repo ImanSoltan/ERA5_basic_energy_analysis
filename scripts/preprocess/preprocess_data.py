@@ -252,6 +252,7 @@ def preprocess_era5_data(input_dir='data/raw', output_dir='data/processed', year
     # Merge and save each variable separately
     print("\nMerging and saving variables...")
     merged_datasets = {}
+    individual_var_files_to_keep = [] # Initialize list to store paths of individual var files
     
     for var, ds_list in datasets_by_var.items():
         try:
@@ -265,6 +266,7 @@ def preprocess_era5_data(input_dir='data/raw', output_dir='data/processed', year
             out_path = os.path.join(output_dir, f"{var}_{area_name}.nc")
             merged.to_netcdf(out_path)
             print(f"Saved {var} to {out_path}")
+            individual_var_files_to_keep.append(os.path.abspath(out_path)) # Add to keep list
             
             merged_datasets[var] = merged
             
@@ -310,7 +312,8 @@ def preprocess_era5_data(input_dir='data/raw', output_dir='data/processed', year
         os.path.abspath(merged_file) if merged_file else None,
         os.path.abspath(site_timeseries_file)
     ]
-    keep_files = [f for f in keep_files if f and os.path.exists(f)]
+    keep_files.extend(individual_var_files_to_keep) # Add individual var files to keep_files
+    keep_files = [f for f in keep_files if f and os.path.exists(f)] # Filter out None or non-existent paths
     
     for f in glob.glob(os.path.join(output_dir, "*.nc")):
         f_abs = os.path.abspath(f)
